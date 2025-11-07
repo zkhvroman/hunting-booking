@@ -1,0 +1,53 @@
+services:
+  nginx:
+    build:
+      context: ./docker/
+      dockerfile: ./nginx/Dockerfile
+    ports:
+        - "80:80"
+    volumes:
+      - ./:/var/www/html
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lara5.rule=Host(`lara10.localhost`)"
+      - "traefik.http.routers.lara5.entrypoints=web"
+
+  php-fpm:
+    build:
+      context: ./docker
+      dockerfile: ./php-fpm/Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    environment:
+      PHP_IDE_CONFIG: serverName=APP
+    volumes:
+      - ./:/var/www/html
+
+  php-cli:
+    build:
+      context: ./docker/
+      dockerfile: ./php-cli/Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    volumes:
+      - ./:/var/www/html
+
+  postgres:
+      image: postgres:16.10-alpine3.22
+      environment:
+          POSTGRES_DB: ${DB_DATABASE:-hunting_booking}
+          POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+          POSTGRES_USER: ${DB_USERNAME:-postgres}
+      ports:
+          - "5432:5432"
+      healthcheck:
+          test: pg_isready -d ${POSTGRES_DB:-hunting_booking}
+          interval: 10s
+      volumes:
+          - postgres_data:/var/lib/postgresql/data:rw
+
+volumes:
+    postgres_data: ~

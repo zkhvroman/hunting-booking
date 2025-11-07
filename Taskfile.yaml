@@ -1,0 +1,78 @@
+version: 3
+
+vars:
+  PHP: 'docker compose run --rm php-cli'
+
+env:
+  APP_ENV: development
+
+dotenv:
+  - '.env.{{.APP_ENV}}.local'
+  - '.env.{{.APP_ENV}}'
+  - '.env.local'
+  - '.env'
+
+tasks:
+  up:
+    cmds:
+      - 'docker compose up --detach --remove-orphans {{.CLI_ARGS}}'
+
+  down: 'docker compose down --remove-orphans {{.CLI_ARGS}}'
+
+  start:
+    cmds:
+      - 'docker compose start {{.CLI_ARGS}}'
+      - task: install
+      - task: npm:install
+
+  stop: 'docker compose stop {{.CLI_ARGS}}'
+
+  php:cli: '{{.PHP}} bash'
+
+  install:
+    cmd: '{{.PHP}} composer install {{.CLI_ARGS}}'
+    sources:
+      - composer.json
+      - composer.lock
+    generates:
+      - vendor/autoload.php
+
+  fixcs:
+    deps: [ install ]
+    cmd: '{{.PHP}} vendor/bin/php-cs-fixer fix --diff --verbose {{.CLI_ARGS}}'
+
+  lint:
+    cmds:
+      - task: fixcs
+        vars:
+          CLI_ARGS: '--dry-run {{.CLI_ARGS}}'
+
+  rector-fix:
+    deps: [ install ]
+    cmd: '{{.PHP}} vendor/bin/rector process {{.CLI_ARGS}}'
+
+  test:unit:
+    deps: [ install ]
+    cmd: '{{.PHP}} vendor/bin/phpunit --group=unit {{.CLI_ARGS}}'
+
+  test:api:
+    deps: [ install ]
+    cmd: '{{.PHP}} vendor/bin/phpunit --group=api {{.CLI_ARGS}}'
+
+  rector:
+    cmds:
+      - task: rector-fix
+        vars:
+          CLI_ARGS: '--dry-run {{.CLI_ARGS}}'
+
+  phpstan:
+    deps: [install]
+    cmd: '{{.PHP}} vendor/bin/phpstan {{.CLI_ARGS}}'
+
+  check:
+    cmds:
+      - task: lint
+      - task: phpstan
+      - task: rector
+      - task: test:unit
+      - task: test:api

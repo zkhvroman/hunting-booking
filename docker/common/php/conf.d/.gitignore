@@ -1,0 +1,6 @@
+.gitignore
+!.gitignore
+!custom.ini
+!security.ini
+!timezone.ini
+!xdebug.ini
