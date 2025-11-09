@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  pull_request: ~
+  push:
+    branches: ['main']
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    env:
+      BROADCAST_DRIVER: log
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      SESSION_DRIVER: database
+      DB_CONNECTION: pgsql
+      DB_HOST: localhost
+      DB_USERNAME: postgres
+      DB_PASSWORD: secret
+      DB_DATABASE: hunting_booking
+    services:
+      postgres:
+        image: postgres:16.10-alpine3.22
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: hunting_booking
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          extensions: >-
+            ctype, curl, dom, fileinfo, filter, hash, mbstring, openssl, pcre, pdo, pgsql, session, tokenizer, xml
+          tools: composer:v2
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        uses: ramsey/composer-install@v2
+        with:
+          composer-options: "--no-progress --prefer-dist --optimize-autoloader"
+
+      - name: Prepare the application
+        run: |
+          php -r "file_exists('.env') || copy('.env.example', '.env');"
+          php artisan key:generate
+
+      - name: Run Migration
+        run: php artisan migrate -v
+
+      - name: Setup Task
+        uses: arduino/setup-task@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run checks
+        run: task check
+        env:
+          LOCALLY: 1
