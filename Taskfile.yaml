@@ -1,7 +1,7 @@
 version: 3
 
 vars:
-  PHP: 'docker compose run --rm php-cli'
+  PHP: '{{if not .LOCALLY}}docker compose run --rm php-cli{{end}}'
 
 env:
   APP_ENV: development
@@ -37,13 +37,13 @@ tasks:
     generates:
       - vendor/autoload.php
 
-  fixcs:
+  cs:fix:
     deps: [ install ]
     cmd: '{{.PHP}} vendor/bin/php-cs-fixer fix --diff --verbose {{.CLI_ARGS}}'
 
-  lint:
+  cs:lint:
     cmds:
-      - task: fixcs
+      - task: cs:fix
         vars:
           CLI_ARGS: '--dry-run {{.CLI_ARGS}}'
 
@@ -71,7 +71,7 @@ tasks:
 
   check:
     cmds:
-      - task: lint
+      - task: cs:lint
       - task: phpstan
       - task: rector
       - task: test:unit
